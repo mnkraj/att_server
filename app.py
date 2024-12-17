@@ -6,39 +6,41 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException
-from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
 import time
 import threading
 import os
 import atexit
 
+# Load environment variables
 load_dotenv()
 id = os.getenv("regn")
 pwd = os.getenv("pwd")
 url1 = os.getenv("login_url")
-url2 = os.getenv("attendacnce_url")
+url2 = os.getenv("attendance_url")
 
 app = Flask(__name__)
 
+# Configure Chrome options for Selenium
 chrome_options = Options()
 chrome_options.page_load_strategy = "none"
-chrome_options.binary_location = "/usr/bin/chromium-browser"
-chrome_options.add_argument('--headless')
 chrome_options.add_argument('--no-sandbox')
 chrome_options.add_argument('--disable-dev-shm-usage')
 chrome_options.add_argument('--disable-gpu')
+chrome_options.binary_location = "/usr/bin/google-chrome"  # Specify Google Chrome path
 
+# Global driver instance with threading lock
 driver_lock = threading.Lock()
-driver = webdriver.Chrome( options=chrome_options)
+driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=chrome_options)
 
 def close_driver():
+    """Close the Selenium driver when the app exits."""
     driver.quit()
 
 atexit.register(close_driver)
 
+# Perform initial login to attendance system
 driver.get(url1)
-
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtuser_id"))).send_keys(id)
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtpassword"))).send_keys(pwd)
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "btnsubmit"))).click()
@@ -48,9 +50,9 @@ driver.execute_script(f"window.location.href = '{url2}';")
 WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
 
 def att(regn):
+    """Fetch attendance for the given registration number."""
     with driver_lock: 
         try:
-            
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlroll"))
             )
@@ -85,9 +87,8 @@ def att(regn):
             WebDriverWait(driver, 10).until(
                 EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv"))
             )
-            time.sleep(5) 
+            time.sleep(5)  # Let data load fully
 
-            
             attendance_table = driver.find_element(By.ID, 'ContentPlaceHolder1_gv')
             attendance = []
             rows = attendance_table.find_elements(By.TAG_NAME, 'tr')
@@ -110,9 +111,9 @@ def att(regn):
         except Exception as e:
             return {"success": False, "message": str(e)}
 
-
 @app.route('/att', methods=['POST'])
 def fetch_attendance():
+    """API endpoint to fetch attendance."""
     try:
         data = request.get_json()
         regn = data.get('regn')
@@ -123,6 +124,5 @@ def fetch_attendance():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 443)))
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
