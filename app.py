@@ -136,4 +136,4 @@ def fetch_attendance():
 
 
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    app.run(host="10.250.15.5", port=int(os.environ.get("PORT", 4444)))
