@@ -5,6 +5,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from flask_cors import CORS 
 from selenium.common.exceptions import StaleElementReferenceException
 from dotenv import load_dotenv
 import time
@@ -19,7 +20,7 @@ url1 = os.getenv("login_url")
 url2 = os.getenv("attendance_url")
 RAILWAY_GRID_URL = os.getenv("SELENIUM_GRID_URL")
 app = Flask(__name__)
-
+CORS(app)
 # Configure Chrome options for Selenium
 chrome_options = Options()
 chrome_options.page_load_strategy = "none"
