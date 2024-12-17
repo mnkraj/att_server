@@ -8,7 +8,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException
 from dotenv import load_dotenv
 import time
-import threading
 import os
 import atexit
 
@@ -18,7 +17,7 @@ id = os.getenv("regn")
 pwd = os.getenv("pwd")
 url1 = os.getenv("login_url")
 url2 = os.getenv("attendance_url")
-
+RAILWAY_GRID_URL = os.getenv("SELENIUM_GRID_URL")
 app = Flask(__name__)
 
 # Configure Chrome options for Selenium
@@ -28,89 +27,94 @@ chrome_options.add_argument("--headless")
 chrome_options.add_argument("--no-sandbox")
 chrome_options.add_argument("--disable-dev-shm-usage")
 chrome_options.add_argument("--disable-gpu")
-chrome_options.binary_location = "/usr/bin/google-chrome"  # Specify Google Chrome path
 
-# Global driver instance with threading lock
-driver_lock = threading.Lock()
-driver = webdriver.Chrome(service=Service("/usr/bin/chromedriver"), options=chrome_options)
+# Global driver instance
+print("Initializing WebDriver...")
+driver = webdriver.Remote(
+    command_executor=RAILWAY_GRID_URL,
+    options=chrome_options
+)
+
 
 def close_driver():
     """Close the Selenium driver when the app exits."""
+    print("Closing WebDriver...")
     driver.quit()
 
 atexit.register(close_driver)
 
-# Perform initial login to attendance system
+# Perform initial login only once
+print("Logging in to the attendance system...")
 driver.get(url1)
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtuser_id"))).send_keys(id)
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtpassword"))).send_keys(pwd)
 WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "btnsubmit"))).click()
 
+# Ensure login success and navigate to attendance page
 WebDriverWait(driver, 10).until(lambda d: d.current_url != url1)
 driver.execute_script(f"window.location.href = '{url2}';")
 WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
+print("Login successful. Ready for attendance fetch requests.")
+
 
 def att(regn):
     """Fetch attendance for the given registration number."""
-    with driver_lock: 
-        try:
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlroll"))
-            )
-            select_element = driver.find_element(By.ID, "ContentPlaceHolder1_ddlroll")
-            driver.execute_script("arguments[0].removeAttribute('disabled');", select_element)
+    try:
+        print("request for " + regn + " received...")
+        
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_ddlroll"))
+        )
+        print("1")
+        select_element = driver.find_element(By.ID, "ContentPlaceHolder1_ddlroll")
+        driver.execute_script("arguments[0].removeAttribute('disabled');", select_element)
 
-            option_text = driver.execute_script(
-                f"""
-                const select = document.querySelector('#ContentPlaceHolder1_ddlroll');
-                const option = Array.from(select.options).find(opt => opt.value === '{regn}');
-                return option ? option.text : null;
-                """
-            )
+        # Select the dropdown option dynamically
+        option_text = driver.execute_script(
+            f"""
+            const select = document.querySelector('#ContentPlaceHolder1_ddlroll');
+            const option = Array.from(select.options).find(opt => opt.value === '{regn}');
+            if (option) {{
+                option.selected = true;
+                select.dispatchEvent(new Event('change'));
+            }}
+            return option ? option.text : null;
+            """
+        )
 
-            if not option_text:
-                return {"success": False, "message": f"Attendance for {regn} not available on portal."}
+        if not option_text:
+            return {"success": False, "message": f"Attendance for {regn} not available on portal."}
 
-            text_parts = option_text.split(' - ')
-            student_name = text_parts[1] if len(text_parts) > 1 else "Unknown"
+        text_parts = option_text.split(' - ')
+        student_name = text_parts[1] if len(text_parts) > 1 else "Unknown"
 
-            driver.execute_script(
-                f"""
-                const select = document.querySelector('#ContentPlaceHolder1_ddlroll');
-                const optionToSelect = Array.from(select.options).find(option => option.value === '{regn}');
-                if (optionToSelect) {{
-                    optionToSelect.selected = true;
-                    select.dispatchEvent(new Event('change'));
-                }}
-                """
-            )
+        # Wait for the attendance table to load
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv"))
+        )
+        time.sleep(3)  # Small delay to ensure data is loaded
 
-            WebDriverWait(driver, 10).until(
-                EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv"))
-            )
-            time.sleep(5)  # Let data load fully
+        # Extract attendance table
+        attendance_table = driver.find_element(By.ID, 'ContentPlaceHolder1_gv')
+        attendance = []
+        rows = attendance_table.find_elements(By.TAG_NAME, 'tr')
+        for row in rows:
+            cells = row.find_elements(By.TAG_NAME, 'td')
+            if not cells:
+                cells = row.find_elements(By.TAG_NAME, 'th')
+            row_data = [cell.text for cell in cells]
+            attendance.append(row_data)
 
-            attendance_table = driver.find_element(By.ID, 'ContentPlaceHolder1_gv')
-            attendance = []
-            rows = attendance_table.find_elements(By.TAG_NAME, 'tr')
-            for row in rows:
-                cells = row.find_elements(By.TAG_NAME, 'td')
-                if not cells:
-                    cells = row.find_elements(By.TAG_NAME, 'th')
-                row_data = [cell.text for cell in cells]
-                attendance.append(row_data)
+        return {
+            "success": True,
+            "name": student_name,
+            "attendance": attendance,
+            "message": f"Attendance for {regn} fetched successfully."
+        }
 
-            return {
-                "success": True,
-                "name": student_name,
-                "attendance": attendance,
-                "message": f"Attendance for {regn} fetched successfully."
-            }
+    except Exception as e:
+        return {"success": False, "message": str(e)}
 
-        except StaleElementReferenceException:
-            return {"success": False, "message": "Stale element encountered. Please retry."}
-        except Exception as e:
-            return {"success": False, "message": str(e)}
 
 @app.route('/att', methods=['POST'])
 def fetch_attendance():
@@ -124,6 +128,7 @@ def fetch_attendance():
         return jsonify(response)
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
+
 
 if __name__ == '__main__':
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
