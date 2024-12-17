@@ -5,41 +5,50 @@ FROM python:3.9-slim
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Install required dependencies and Google Chrome
+# Install dependencies and required libraries
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
     unzip \
     gnupg \
-    fonts-liberation \
-    libx11-6 \
+    libssl1.1 \
+    libglib2.0-0 \
+    libnss3 \
+    libgconf-2-4 \
     libx11-xcb1 \
     libxcomposite1 \
-    libxcursor1 \
     libxdamage1 \
     libxext6 \
     libxfixes3 \
     libxi6 \
     libxrandr2 \
     libxrender1 \
-    libxss1 \
-    libxtst6 \
-    libcups2 \
-    libnss3 \
     libatk1.0-0 \
+    libcups2 \
     libatk-bridge2.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf2.0-0 \
     libasound2 \
-    libwayland-client0 \
-    libwayland-cursor0 \
-    libwayland-egl1 \
-    libxkbcommon0 \
-    libpango-1.0-0 \
+    libxss1 \
+    libxtst6 \
+    libdbus-glib-1-2 \
+    fonts-liberation \
+    libfontconfig1 \
     --no-install-recommends && \
-    wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Install Google Chrome
+RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt-get install -y ./google-chrome-stable_current_amd64.deb && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* google-chrome-stable_current_amd64.deb
+    rm google-chrome-stable_current_amd64.deb
+
+# Install ChromeDriver (matching Chrome version)
+RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+' | cut -d. -f1) && \
+    wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}.0.0/linux64/chromedriver-linux64.zip" -O /tmp/chromedriver.zip && \
+    unzip /tmp/chromedriver.zip -d /usr/bin/ && \
+    rm /tmp/chromedriver.zip && \
+    mv /usr/bin/chromedriver-linux64/chromedriver /usr/bin/chromedriver && \
+    chmod +x /usr/bin/chromedriver
 
 # Install Python dependencies
 COPY requirements.txt /app/requirements.txt
