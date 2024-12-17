@@ -54,7 +54,7 @@ WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "btnsubmit"))
 # Ensure login success and navigate to attendance page
 WebDriverWait(driver, 10).until(lambda d: d.current_url != url1)
 driver.execute_script(f"window.location.href = '{url2}';")
-WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
+# WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
 print("Login successful. Ready for attendance fetch requests.")
 
 
