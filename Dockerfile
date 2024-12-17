@@ -1,17 +1,17 @@
-# Use Python base image
+# Use the Python 3.9 slim image
 FROM python:3.9-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Install dependencies and required libraries
+# Install dependencies (without libssl1.1)
 RUN apt-get update && apt-get install -y \
     wget \
     curl \
     unzip \
     gnupg \
-    libssl1.1 \
+    libssl3 \
     libglib2.0-0 \
     libnss3 \
     libgconf-2-4 \
@@ -38,11 +38,11 @@ RUN apt-get update && apt-get install -y \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Install Google Chrome
-RUN wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
     apt-get install -y ./google-chrome-stable_current_amd64.deb && \
     rm google-chrome-stable_current_amd64.deb
 
-# Install ChromeDriver (matching Chrome version)
+# Install ChromeDriver
 RUN CHROME_VERSION=$(google-chrome --version | grep -oP '\d+\.\d+\.\d+\.\d+' | cut -d. -f1) && \
     wget -q "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}.0.0/linux64/chromedriver-linux64.zip" -O /tmp/chromedriver.zip && \
     unzip /tmp/chromedriver.zip -d /usr/bin/ && \
@@ -58,8 +58,8 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy application code
 COPY . /app
 
-# Expose Railway's dynamic port
+# Expose port
 EXPOSE $PORT
 
-# Run Flask app
+# Run the app
 CMD ["python", "app.py"]
