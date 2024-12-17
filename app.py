@@ -47,14 +47,14 @@ atexit.register(close_driver)
 # Perform initial login only once
 print("Logging in to the attendance system...")
 driver.get(url1)
-WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtuser_id"))).send_keys(id)
-WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "txtpassword"))).send_keys(pwd)
-WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, "btnsubmit"))).click()
+WebDriverWait(driver, 100).until(EC.element_to_be_clickable((By.ID, "txtuser_id"))).send_keys(id)
+WebDriverWait(driver, 100).until(EC.element_to_be_clickable((By.ID, "txtpassword"))).send_keys(pwd)
+WebDriverWait(driver, 100).until(EC.element_to_be_clickable((By.ID, "btnsubmit"))).click()
 
 # Ensure login success and navigate to attendance page
 WebDriverWait(driver, 10).until(lambda d: d.current_url != url1)
 driver.execute_script(f"window.location.href = '{url2}';")
-WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
+# WebDriverWait(driver, 10).until(lambda d: d.execute_script("return document.readyState") == "complete")
 print("Login successful. Ready for attendance fetch requests.")
 
 
@@ -69,7 +69,7 @@ def att(regn):
         print("1")
         select_element = driver.find_element(By.ID, "ContentPlaceHolder1_ddlroll")
         driver.execute_script("arguments[0].removeAttribute('disabled');", select_element)
-
+        print("2")
         # Select the dropdown option dynamically
         option_text = driver.execute_script(
             f"""
@@ -82,30 +82,34 @@ def att(regn):
             return option ? option.text : null;
             """
         )
+        print("3")
 
         if not option_text:
             return {"success": False, "message": f"Attendance for {regn} not available on portal."}
-
+        print("4")
         text_parts = option_text.split(' - ')
         student_name = text_parts[1] if len(text_parts) > 1 else "Unknown"
-
+        print("5")
         # Wait for the attendance table to load
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv"))
         )
+        print("6")
         time.sleep(5)  # Small delay to ensure data is loaded
-
+        print("7")
         # Extract attendance table
         attendance_table = driver.find_element(By.ID, 'ContentPlaceHolder1_gv')
+        print("8")
         attendance = []
         rows = attendance_table.find_elements(By.TAG_NAME, 'tr')
+        print("9")
         for row in rows:
             cells = row.find_elements(By.TAG_NAME, 'td')
             if not cells:
                 cells = row.find_elements(By.TAG_NAME, 'th')
             row_data = [cell.text for cell in cells]
             attendance.append(row_data)
-
+        print("10")
         return {
             "success": True,
             "name": student_name,
