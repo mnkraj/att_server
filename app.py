@@ -92,7 +92,7 @@ def att(regn):
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.ID, "ContentPlaceHolder1_gv"))
         )
-        time.sleep(3)  # Small delay to ensure data is loaded
+        time.sleep(5)  # Small delay to ensure data is loaded
 
         # Extract attendance table
         attendance_table = driver.find_element(By.ID, 'ContentPlaceHolder1_gv')
